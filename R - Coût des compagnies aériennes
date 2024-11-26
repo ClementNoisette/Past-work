@@ -1,0 +1,371 @@
+---
+title: "PROJET R - Coûts des compagnies aériennes"
+author: "Coindre Noisette Masciavè"
+date: "2024-03-04"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+# Package
+
+```{r,message=FALSE}
+library(readxl)
+library(GGally)
+library(VIM)        
+library(dplyr)
+library(knitr)
+library(ggplot2)
+library(plm)
+library(stargazer)
+library(gplots)
+library(lmtest)
+library(zoo)
+```
+
+# Installation de la base de donnée & Mise en forme
+
+```{r}
+
+Airlines <- read_excel("PanelData.xls")
+
+#On chance le nom des colonnes
+colnames(Airlines)[colnames(Airlines) == "C"] <- "Cout"
+colnames(Airlines)[colnames(Airlines) == "PF"] <- "PrixFuel"
+colnames(Airlines)[colnames(Airlines) == "LF"] <- "FDC"
+colnames(Airlines)[colnames(Airlines) == "Q"] <- "RPM"
+colnames(Airlines)[colnames(Airlines) == "I"] <- "Compagnie"
+colnames(Airlines)[colnames(Airlines) == "T"] <- "Annee"
+
+#On utilise pdata afin de faire savoir à R que l'on traite une base de donnée de panel, aussi pour l'utilisation du package plm plus tardivement.
+
+Airlines2 <- pdata.frame(Airlines, index=c("Compagnie","Annee"), drop.index=TRUE, row.names=TRUE)
+summary(Airlines2)
+attach(Airlines2)
+
+```
+
+Nous avons trouvé notre base de donnée sur [Kaggle]{.underline} à ce lien : <https://www.kaggle.com/datasets/sandhyakrishnan02/paneldata?resource=download>
+
+Cette base de donnée initialement élaborées par "Christensen Associates" de Madison, dans le Wisconsin, est un jeu de donnée provenant de la Stern School of Business de l'Université de New York. Elle représente des données de panel sur les coûts des compagnies aériennes américaines sur 15 ans, de 1970 à 1984.
+
+[***Problématique : "Quels impacts ont les différents facteurs présent sur le coût des compagnies aériennes ?"c***]{.underline}
+
+# Description des variables de la base de donnée
+
+[**Description des variables**]{.underline}
+
+Compagnie = Indique la compagnie en question, on a ici 6 compagnies aériennes différentes.
+
+Année = année à laquelle la donnée a été observée. Il y a 15 années ici entre 1970 et 1984.
+
+PrixFuel = L'indice et les données de prix indiquent le prix moyen mondial payé à la raffinerie pour le carburéacteur à la date indiquée.
+
+Prix FDC = Facteur de charge, qui représentant le pourcentage de sièges occupés sur un vol par rapport au nombre total de sièges disponibles.
+
+RPM = Revenues Passenger Miles, ou le nombre de miles (mesure de distance américaine) parcourus par des passagers ayant payé pour un vol donné (statistique de trafic aérien)
+
+Coût = Dépend de plusieurs facteurs, dont le prix du carburant, le facteur de charge, la location et l'amortissement, l'entretien de l'avion, la main-d'œuvre et les frais de manutention à l'aéroport.
+
+# Description des données
+
+```{r}
+head(Airlines2)
+```
+
+Nous avons une base de donnée de panel, comportant [4 variables numériques]{.underline}, la variable de temps "Année" (de 1970 à 1984) et une variable dépendante choisie (Coût) dans la base de donnée.
+
+# Données manquantes
+
+Vérifions si notre base de donnée contient des valeurs manquantes.
+
+```{r}
+ISNAAirlines <- aggr(Airlines2,
+                       col=c('lightblue','brown'),
+                       sortVars=TRUE,
+                       labels=names(data),
+                       cex.axis=.7, gap=3,
+                       ylab=c("Histogramme des valeurs manquantes","Valeurs présente"))
+
+summary(ISNAAirlines)
+```
+
+Nous n'avons aucune données manquantes, donc pas d'attrition dans nos données.
+
+# Statistiques descriptives et corrélation
+
+Regardons les statistiques principales de nos variables :
+
+```{r}
+stargazer(as.data.frame(Airlines2), type = "text", min.max=TRUE, mean.sd = TRUE, nobs = TRUE, median = TRUE, digits=1, title = "Summary Statistics")
+```
+
+Nous avons bien 90 données dans chaque variables. Avec des coûts pour les 6 firmes de 1970 à 1984 de 1 122 524 000 \$ en moyenne environ.
+
+```{r}
+#Commande permettant de désactiver la notation exponentielle
+options(scipen = 999)
+
+# Création d'un vecteur de couleurs pour différencier les compagnies
+couleurs <- rainbow(length(unique(Airlines$Compagnie)))
+
+plot(Airlines$Cout, 
+     col = couleurs[Airlines$Compagnie],
+     pch = 16,
+     main = "Dispersion du coût en fonction de la compagnie, de 1970 à 1984",
+     xlab = "Compagnies",
+     ylab = "Coût",
+     xaxt = "n")
+
+```
+
+On remarque que les coûts de l'entreprise 1 et 2 sont supérieurs largement aux 4 autres compagnies aériennes. On peut supposer que plus de coûts de leurs parts équivaut à une plus grande taille de celle-ci.
+
+Relation entre le coût et nos variables
+
+```{r}
+ggplot(data = Airlines, aes(x = PrixFuel, y = Cout)) +
+  geom_point() +  # Ajouter des points pour les données
+  geom_smooth(method = "lm", se = FALSE, color = "red") +  # Ajouter une ligne de régression linéaire
+  labs(title = "Relation entre le coût et le prix du carburant", x = "Prix du carburant", y = "Coût") +
+  theme_minimal()
+```
+
+Présence d'une relation positive entre le coût et le prix du fuel. Donc plus le prix de l'essence utilisé pour les avions augmente plus le coût associé aux vols est élevé.
+
+```{r}
+ggplot(data = Airlines, aes(x = RPM, y = Cout)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE, color = "red") +  
+  labs(title = "Relation entre le coût et le RPM", x = "Nombre de miles parcourus en moyenne par passager", y = "Coût") +
+  theme_minimal()
+```
+
+[Matrice de corrélation :]{.underline}
+
+```{r}
+ggpairs(Airlines[, c("Cout","RPM","PrixFuel","FDC")])
+```
+
+On peut remarquer que nos 3 variables RPM, Prix Fuel et FDC sont corrélées positivement avec le coût des compagnies aériennes.
+
+# Hétérogénéité :
+
+On cherche à savoir si notre base de donnée contient de l'hétérogénéité. En effet, notre modèle peut présenter des prédicteurs omis et pourrait se refléter dans le terme d'erreur.
+
+```{r}
+boxplot(Cout ~ Compagnie, main = 'Hétérogénéité entre les compagnies',col = "lightblue", data = Airlines)
+```
+
+```{r}
+plotmeans(Cout~Annee , main = 'Hétérogénéité au sein des compagnies aériennes', data = Airlines)
+```
+
+Pour compléter la recherche d'hétérogénéité entre nos des groupes de données on peut utiliser le test d'hétérogénéité d'ANOVA, consistant à réaliser une analyse de variance afin de comparer les moyennes entre les groupes.
+
+```{r}
+
+model <- aov(Cout ~ Compagnie, data = Airlines)
+summary(model)
+
+```
+
+Le résultat donné par ce test nous indique qu'effectivement la différence entre les moyennes des compagnies est très significative. En d'autres termes, les coûts varient considérablement entre les différentes compagnies aériennes.
+
+# Régressions linéaires :
+
+On choisit logiquement d'avoir comme variable dépendante le coût, que nous exprimerons en fonction du RPM, du prix du fuel et du facteur de charge. L'équation seras alors de la forme :
+
+$$ Cout = \alpha_i + \beta_1 * RPM + \beta_2 * FDC + \beta_3 * PrixFuel + \epsilon_it $$
+
+# Estimation du modèle à effets fixes :
+
+Avec Within
+
+```{r}
+
+within_model <- plm(Cout ~ PrixFuel + FDC + RPM, data = Airlines2, model = "within")
+
+#Entre les années
+summary(within_model)
+
+#Comparer entre les compagnies
+summary(fixef(within_model))
+
+```
+
+Les compagnies aériennes 3, 4, 5 et 6 ont des estimations d'effets fixes statistiquement significatives à un niveau de confiance de 95%, car elles ont des valeurs p très faibles (\< 0.05). Cela signifie qu'il y a des différences significatives dans les coûts entre ces compagnies aériennes une fois que vous contrôlez pour les autres variables dans le modèle. Les variables indépendantes sont aussi significatives. En revanche, les compagnies aériennes 1 et 2 n'ont pas d'estimations d'effets fixes statistiquement significatives, car leurs valeurs p sont supérieures à 0.05. Cela suggère qu'il n'y a pas de différence statistiquement significative dans les coûts entre ces compagnies aériennes et les autres compagnies une fois que l'on a contrôler pour les autres variables dans le modèle.
+
+Avec la différence première :
+
+```{r}
+
+D1_model <- plm(Cout ~ PrixFuel + FDC + RPM, data = Airlines2, model = "fd")
+
+#Test d'Hausman
+phtest(within_model, D1_model)
+
+```
+
+Le test d'hausman ici compare le modèle à effets fixes within à celui en différence premières. En posant les hypothèses H0 : Les deux méthodes sont également efficaces (coefficients des variables explicatives sont les mêmes dans les deux modèles.) H1 : Une des méthodes d'estimation est inconsistente Le test nous donne une p-value inférieur à 5%, rejetant ainsi l'hypothèse nulle. Un des deux modèles est donc inconsistent par rapport à l'autre et nous garderons le modèle within, due au fait que si la base de donnée voit son εit être iid (pour T \> 2) alors within est par nature plus efficient que D1 du au fait qu'elle écarte une période d'observation par construction , comme vu dans le cours.
+
+# Estimation du modèle à effets aléatoires :
+
+```{r}
+
+random_model <- plm(Cout ~ PrixFuel + FDC + RPM, data = Airlines2, model = "random")
+summary(random_model)
+
+```
+
+Dans l'ensemble, les résultats suggèrent que le modèle utilisé explique une grande partie de la variance. On va regarder grâce au test d'Hausman quelle estimation convient le mieux à nos données.
+
+# Test d'Hausman :
+
+```{r}
+
+#Test d'Hausman
+phtest(within_model, random_model)
+
+```
+
+De manière identique au test d'Hausman précédent, ici la p-value suggère de rejeter une nouvelle fois H0. Un des deux modèles est donc inconsistent entre Within et MCG. Or, comme $$\hat{\beta}_{W}$$ est consistant peut importe le modèle, si $$\hat{\beta}_{EA}$$ est différent, il doit alors être inconsistant.
+
+On sait ainsi que les effets individuels $$\alpha_i$$ sont corrélés avec les régresseu r$$X_{it}$$
+
+(On pourrait utiliser des variables instrumentales afin de revenir sur un modèle EA mais nous n'avons pas la possibilité ici de rajouter des régresseurs.)
+
+Nous n'aurons pas à nous soucier d'une des limites de l'estimateur within qui est qu'elle n'identifie pas les régresseur invariants dans le temps car nous n'avons pas de regrésseur invariant. De plus avec la présence remarqué plus tôt d'hétérogénéité inobservée l'utilisation de l'estimateur des moindres carrés généralisé (MCG) ou simplement les MCO aurait aboutit à une corrélation spurieuse. Notre estimateur EF permettra d'éliminer cette hétérogénéité inobservée.
+
+# Autocorrélation
+
+Nous émettons l'hypothèse que notre base de donnée pourrait avoir de l'autocorrélation, car nous pensons que les années précédentes peuvent influer sur le cout des années suivantes notamment avec le prix du fuel : souvent est contracté un accord sur plusieurs années liant les fournisseurs de fuel et les compagnies sur un prix/une quantité choisit.
+Nous testons cela à l'aide du test de Breusch-Godfrey suivant, qui estime l'autocorrélation des résidus à différents retards et nous donne ainsi une p-value nous permettant de rejeter ou non l'hypothèse nulle d'absence d'autocorrélation.
+
+```{r}
+
+#test de Breusch-Godfrey sur les résidus du modèle
+test_autocorrelation <- pbgtest(within_model, order = 1, type = c("Chisq"))
+
+test_autocorrelation
+
+```
+Ici le p-value donnée est inférieur à 5%, nos données de panel ont donc de la corrélation sérielle.
+
+Nous ferons ensuite un contrôle en plus de l'hétéroscédasticité, que nous pourrons par la suite tester, afin qu'à l'aide de White on puisse finalement obtenir une inférence robuste de notre régression malgrès l'autocorrélation et la possible hétéroscédasticité.
+
+# Hétéroscédasticité
+
+Pour cela plusieurs méthodes sont possible afin de vérifier si la variance des résidus dans un modèle de régression est constante, par exemple il y a le test de White ou de Breusch-Pagan, qui permettent de déterminer si notre base de donnée a de l'hétérogénéité, mais aussi on peut représenter graphiquement les résidus du modèle par rapport aux valeurs prédites.
+
+graphiquement cela donne :
+
+```{r}
+
+lmMod <- lm(Cout ~ RPM+PrixFuel+FDC+factor(Compagnie)+factor(Annee), data=Airlines)
+
+plot(lmMod)
+
+```
+Plusieurs graphiques sont représentés, celui nous intéressant est celui des "Residuals vs Fitted", représentant les résidus du modèle en fonction de ceux prédits, et on remarque qu'il y a une différence entre les deux, les valeurs prédites ne correspondent pas à celles attendues. (il n'y a pas de répartition égale des résidus, ce qui équivaut à une ligne rouge pas droite pouvant indiquer une absence d'hétéroscédasticité)
+
+Pour confirmer ce que l'on a pu observer graphiquement, nous nous penchons sur le test de Breusch-Pagan
+
+```{r}
+
+bptest(Cout ~ RPM+PrixFuel+FDC+factor(Compagnie)+factor(Annee), data=Airlines)
+
+```
+Le test de Breusch-Pagan utilise les résidus de notre modèle pour ensuite estimer leurs variances pour chaque observation dans l'échantillon. Après cela est opéré un calcul de la variance moyenne de ces estimations afin de réaliser un test statistique ayant pour but de rejeter ou non l'hypothèse nulle. (selon laquelle la variance des résidus est constante à travers toutes les observations)
+
+Un rejet de l'hypothèse nulle indique alors une hétéroscédasticité des résidus, ce qui est le cas d'après le test effectué (<5%). Il y a donc présence d'hétéroscédasticité dans notre modèle.
+
+```{r}
+
+vcovHC.within <- vcovHC(within_model,method="arellano")
+summary(vcovHC.within)
+
+```
+
+On choisit la méthode avec Arellano et pas white1 ni white2 car on connaît la présence d'hétéroscédasticité ainsi que d'autocorrélation dans notre modèle que l'on souhaite estimer.
+
+```{r}
+
+result1<-coeftest(within_model, vcov.=vcovHC.within)
+result1
+
+```
+
+Tous les coefficients sont significatifs à un niveau de confiance élevé, ce qui suggère que les variables PrixFuel, FDC et RPM ont un impact significatif sur la variable dépendante Cout dans notre modèle.
+
+# Modèle retardé
+
+Nous souhaitons ici étudier le lien entre l'évolution du prix du fuel en t-1 et t-2 et le coût pour la compagnie à la période t.
+
+```{r}
+
+within_model_lag <- plm(Cout ~ lag(PrixFuel,1)+FDC+RPM, data = Airlines2, model = "within")
+summary(within_model_lag)
+within_model_lag2<-plm(Cout ~ lag(PrixFuel,2)+FDC+RPM, data = Airlines2, model = "within")
+summary(within_model_lag2)
+
+```
+
+```{r}
+
+#Coefficients en T
+result1<-coeftest(within_model, vcov.=vcovHC.within)
+result1
+
+#Coefficients en T+1
+vcovHC.lag<-vcovHC(within_model_lag, method="arellano")
+summary(vcovHC.lag)
+result2<-coeftest(within_model_lag, vcov.=vcovHC.lag)
+result2
+
+#Coefficients en T+2
+vcovHC.lag2<-vcovHC(within_model_lag2, method="arellano")
+summary(vcovHC.lag2)
+result3<-coeftest(within_model_lag2, vcov.=vcovHC.lag2)
+result3
+
+```
+
+Donc lorsque l'on utilise la méthode des retards, cela nous permet de mesurer l'impact de ces variables retardés sur la variable dépendante. Dans notre cas, on remarque que le prix du fuel avec une ou deux période de retards, a un effet significatif sur la variable dépendante mais pas que.
+En effet c'est le même cas avec un sous periode(s) de retard(s), le Revenue Passenger Miles est lui aussi significatif voire plus comparé au prix du fuel, tandis que le facteur de charge quant à lui est significatif en période T et T+1 mais pas en T+2, ce qui pourrait insinuer qu'a partir de deux année d'affilée le lien entre le cout et le facteur de charge n'est plus significatif. 
+Il est totalement compréhensible que le facteur de charge explique moins le cout des compagnies comparés aux autres variables car un avion même à moitié remplis feras tout de même le trajet définis.-
+
+```{r}
+
+stargazer(result1, result2, result3, type = "text",  omit = "se", p.auto = TRUE)
+
+```
+
+Les résultats obtenus ici indiquent ce qui a été dis plus haut mais en plus présentable. De plus on voit qu'il y a un seuil de significativité supérieur à ceux présent dans les différents "result" ce que l'on ne comprends pas.
+
+#Modèle dynamique
+
+Pour tester notre modèle sous forme dynamique on peut utiliser des variables instrumentales. Nous ne pouvons rajouter de variables instrumentales hormis par utiliser des variables retardés ici car nous n'avons que nos 3 régresseurs.
+
+```{r}
+
+result1_VI <- plm(Cout ~ PrixFuel + FDC + RPM|lag(PrixFuel) + lag(FDC) + lag(RPM), data = Airlines2, model = "within")
+summary(result1_VI)
+
+result1
+
+```
+On remarque la hausse de significativité des régresseurs avec leurs variables instrumentales. Le RPM est trés significatif, ce qui semble logique, plus un passager feras de kilomètre et donc plus l'avion feras de distance plus le coût associés pour la compagnie est élevé.
+On voit que le facteur de charge influence négativement le cout. Plus une compagnie voient ses vols avec des sièges réservé le moins elle subiras ses propres coûts. 
+Pour finir, le coefficient associé au prix du fuel nous montre que le coût d'une compagnie en moyenne sur une année est lié positivement à celle-ci. En effet plus le prix du fuel des vols d'une compagnie est élevé plus le coût de la compagnie seras grande. 
+La variable influencant alors le plus le cout d'une compagnie est la distance parcourus par un passager en moyenne sur un an.
+
+
+
+
+
+
+
