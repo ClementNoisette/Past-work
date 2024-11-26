@@ -1,0 +1,321 @@
+---
+title: "Projet commun COINDRE Arthur & NOISETTE Clément"
+format: pdf
+editor: visual
+---
+
+On retrouve notre base de donnée à partir de ce lien.
+
+https://archive.ics.uci.edu/dataset/186/wine+quality
+
+Installation des packages
+
+{r, eval=TRUE, echo=FALSE}
+library(stargazer)
+library(readr)
+library(ggplot2)
+library(ggpubr)
+library(GGally)
+library(tidyr)
+#install.packages("VIM")
+library(VIM)
+#install.packages("GridExtra")
+library(gridExtra)
+library(tidyverse)
+#install.packages("labelled")
+library(labelled)
+#install.packages("lmtest")
+library(lmtest)
+#install.packages("sandwich")
+library(sandwich)
+#install.packages("estimatr")
+library(estimatr)
+
+Importation de la base de donnée :
+
+{r}
+wine<- read.csv("winequality-red.csv", sep=";")
+
+Quelques statistiques descriptives : commençons par regarder brièvement s'il existe des valeurs manquantes.
+
+{r, echo=FALSE}
+ISNAWine <- aggr(wine,
+                       col=c('blue','red'),
+                       sortVars=TRUE,
+                       labels=names(data),
+                       cex.axis=.7, gap=3,
+                       ylab=c("Histogramme des valeurs manquantes","Valeurs présente"))
+
+Nous avons 0 données manquantes dans notre base de donnée.
+
+Un résumé court de nos variables :
+
+{r, echo=FALSE}
+stargazer(as.data.frame(wine), type = "text", min.max=TRUE, mean.sd = TRUE, nobs = TRUE, median = FALSE, omit.summary.stat = c("p25", "p75"), digits=1, title = "Summary Statistics")
+
+La variable pH contient sa moyenne logiquement entre 0 et 14 (ici elle est de 3.3) , chaques variables n'est pas à la même échelle, par exemple la densité ne seras pas mesuré et décris#de la même façon que le taux d'alcool ou encore acide citrique.
+
+Un histogramme de la distribution de notre variable expliquée.
+
+{r, echo=FALSE}
+ggplot(wine, aes(x = as.factor(quality), fill = factor(quality))) +
+  geom_bar(position = "identity") +
+  geom_text(stat="count", aes(label=..count..), vjust=-0.5) +
+  labs(title = "Distribution de la qualité du vin", x = "Qualité", y = "Fréquence") +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),             # Supprimer les lignes de grille majeures
+        panel.border = element_blank(),                 # Supprimer la bordure du panneau
+        axis.line = element_line(color = "black"),      # Ajouter des lignes d'axe noires
+        legend.position = "none")
+
+Les valeurs de notre variable dépendante Y étant la qualité d'un vin se trouvent entre 3 et 8. Grande part des vins sont notés 5 ou 6, il semblerait qu'il n'existe pas de trés mauvais vins (moins de 3) ni d'excellent vins (plus de 8).
+
+Ajout d'une colonne "prop.alcohol" pour indiquer si le taux d'alcool est supérieur à la moyenne
+
+{r, echo=FALSE}
+wine$prop.alcohol <- ifelse(wine$alcohol >= mean(wine$alcohol, na.rm = TRUE), "oui", "non")
+
+Conversion de la variable "prop.alcohol" en facteur avec les niveaux "non" et "oui"
+
+{r, echo=FALSE}
+wine$prop.alcohol <- factor(wine$prop.alcohol, levels = c("non", "oui"))
+
+Utilisation de ggplot pour créer le graphique entre l'alcool et la qualité.
+
+{r, echo=FALSE}
+ggplot(wine) +
+  aes(x = quality, y = alcohol, size = alcohol, colour = prop.alcohol) +
+  geom_point(alpha = 0.5) + 
+  xlab("Qualité du vin") +
+  ylab("Taux d'alcool") +
+  labs(size = "Taux d'alcool", colour = "Taux d'alcool supérieur à la moyenne") + 
+  theme(
+    legend.position = "bottom",
+    legend.box = "vertical")
+
+Pas de relation ne se dessine plus que ça
+
+{r ,echo=FALSE}
+ggplot(wine) +
+  aes(x = wine$quality, y = wine$alcohol) +
+  geom_smooth(method = "lm") +
+  geom_point() +
+  xlab("Mesure de la qualité du vin") +
+  ylab("Taux d'alcool dans le vin")
+
+
+Ici on remarque que la relation est positive entre le vin et sa qualité : Plus le vin est de bonne qualité, plus il est alcoolisé ? On pourra le vérifier surtout lors des régressions.
+
+Graphique représentant la distribution de l'axidité volatile du vin.
+
+{r,echo=FALSE}
+ggplot(wine, aes(x = fixed.acidity, fill = factor(fixed.acidity))) +
+  geom_histogram(binwidth = 0.55, position = "identity", alpha = 0.7) +
+  labs(title = "Distribution de l'acidité fixe du vin", x = "Acidité fixe", y = "Fréquence") +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        legend.position = "none")
+
+Graphique représentant la distribution de l'axidité fixe du vin.
+
+{r, echo=FALSE}
+ggplot(wine, aes(x = volatile.acidity, fill = factor(volatile.acidity))) +
+  geom_histogram(binwidth = 0.1, position = "identity", alpha = 0.7) +
+  labs(title = "Distribution de l'acidité volatile du vin", x = "Acidité volatile", y = "Fréquence") +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        legend.position = "none")
+
+Graphiques représentant les distributions du dioxyde de soufre libre et total dans le vin.
+
+{r, echo=FALSE}
+Graph1 <- ggplot(wine, aes(x = free.sulfur.dioxide, fill = factor(free.sulfur.dioxide))) +
+  geom_histogram(binwidth = 5, position = "identity", alpha = 0.7) +
+  labs(title = "Distribution du dioxyde de soufre libre", x = "Dioxyde de soufre libre", y = "Fréquence") +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        legend.position = "none")
+
+Graph2 <- ggplot(wine, aes(x = total.sulfur.dioxide, fill = factor(total.sulfur.dioxide))) +
+  geom_histogram(binwidth = 10, position = "identity", alpha = 0.7) +
+  labs(title = "Du soufre total dans le vin", x = "Dioxyde de soufre total", y = "") +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        legend.position = "none")
+
+grid.arrange(Graph1, Graph2, ncol = 2)
+
+Matrice de corrélation
+
+{r, echo=FALSE}
+ggpairs(wine[, c("alcohol", "sulphates", "citric.acid", "volatile.acidity","residual.sugar","quality")])
+
+ggpairs(wine[, c("fixed.acidity", "volatile.acidity","pH","chlorides","free.sulfur.dioxide","total.sulfur.dioxide","quality")])
+
+
+Il est intéressant de regarder les corrélations avec la qualité car c'est avec cette variable précisément que nous allons travailler.
+
+Vérification de la présence d'outlier
+
+{r, echo=FALSE}
+boxplot(wine, col = c("blue"),main = "Box plot des variables")
+boxplot(wine$total.sulfur.dioxide, main = "Boxplot de total.sulfur.dioxide", col="lightblue")
+
+Il semblerait qu'une variable (total.sulfure.dioxide) ait des outliers.
+
+Identifier les outliers :
+
+{r, echo=FALSE}
+outliers <- boxplot(wine$total.sulfur.dioxide, plot = FALSE)$out
+outliers
+
+On a 45 "outliers", pourtant on ne voit pas autant sur la boite à moustache précédente, on remarque que 2 valeurs dans celles-ci sont particulièrement élevé par rapport aux autres : 278 et 289. On va enlever ces données de notre base.
+
+Extraire les lignes correspondant aux outliers 289 et 278
+
+{r, echo=FALSE}
+specific_outliers <- which(wine$total.sulfur.dioxide %in% c(289, 278))
+specific_outliers
+
+Supprimer les lignes (1080 et 1082) correspondant aux valeurs aberrantes spécifiques
+
+{r, echo=FALSE}
+wine <- wine[-specific_outliers, ]
+
+Afficher le nouveau boxplot pour vérification
+
+{r, echo=FALSE}
+boxplot(wine$total.sulfur.dioxide, main = "Boxplot de total.sulfur.dioxide (après suppression des outliers)")
+
+Test de validité des hypothèses.
+
+Colinéarité
+
+On peut se demander logiquement si les variables total.sulfure.dioxide & free.sulfure.dioxide et si volatile.acidity & fixed.acidity sont corrélés naturellement. Cela poserait des problèmes de multicolinéarité#Pour ce faire nous allons tester ces variables.
+
+Créer un scatter plot avec une ligne de régression
+
+{r, echo=FALSE}
+plot(wine$total.sulfur.dioxide, wine$free.sulfur.dioxide, 
+     main = "Diagramme de dispersion entre total.sulfur.dioxide et free.sulfur.dioxide",
+     xlab = "total.sulfur.dioxide",
+     ylab = "free.sulfur.dioxide")
+abline(lm(wine$free.sulfur.dioxide ~ wine$total.sulfur.dioxide), col = "red")
+
+Calculer le coefficient de corrélation
+
+{r, echo=FALSE}
+correlation <- cor(wine$total.sulfur.dioxide, wine$free.sulfur.dioxide)
+
+Afficher le coefficient de corrélation
+
+{r, echo=FALSE}
+print(paste("Coefficient de corrélation entre total.sulfur.dioxide et free.sulfur.dioxide :", correlation))
+
+Il semblerait y avoir une corrélation entre ces deux variables (positives)
+
+Pour calculer la multicolinéarité entre deux variables nous pouvons utiliser le calcul des FIV (Facteur d'Inflation de la Variance), Les FIV estiment de combien la variance d’un coefficient est augmentée en raison d’une relation linéaire avec d’autres prédicteurs. Si tous les FIV sont égaux à 1, il n'existe pas de multicolinéarité, mais si certains FIV sont supérieurs à 1, les prédicteurs sont corrélés. Lorsqu'un FIV est supérieur à 5, le coefficient de régression de ce terme n'est pas correctement estimé. Nous cherchons donc à éviter cette corrélation.
+
+On créer notre modèle.
+
+{r, echo=FALSE}
+mod <- lm(quality ~ total.sulfur.dioxide + free.sulfur.dioxide + alcohol + fixed.acidity +
+    volatile.acidity + citric.acid + residual.sugar + chlorides + density +
+    pH + sulphates, data = wine)
+
+On regarde les colinéarités entre les variables avec les FIV.
+
+{r, echo=FALSE}
+mc <- mod |> performance::check_collinearity()
+
+On peut représenter graphiquement nos résultats.
+
+{r, echo=FALSE}
+plot(mc)
+
+Ou juste présenter nos résultats classiquement.
+
+{r, echo=FALSE}
+mc
+
+Deux variables ont un score supérieur à 5, l'acidité fixe et la densité, ce qui signifie que l'on va éviter de les utiliser pour un maximum de précision de la part de notre modèle.
+
+Homoscédasticité
+
+Tester l'hétéroscédasticité avec le test de Breusch-Pagan, on utilise le modèle de régression précédemment utilisé, sans les variables avec présence de colinéarité :
+
+{r, echo=FALSE}
+mod1 <- lm(quality ~ total.sulfur.dioxide + free.sulfur.dioxide + alcohol +
+            volatile.acidity + citric.acid + residual.sugar + chlorides +
+            pH + sulphates, data = wine)
+
+bp_test <- bptest(mod1)
+
+Afficher les résultats du test
+
+{r, echo=FALSE}
+bp_test
+
+La valeur de p (p-value) du test de Breusch-Pagan est inférieure au seuil de significativité (0.05), on peut rejeter l'hypothèse nulle d'homoscédasticité (variance constante) et conclure qu'il y a des signes d'hétéroscédasticité dans les résidus du modèle. Essayons de corriger ceux-ci. On utilise la méthode des moindres carrés pondérés (WLS) avec des poids basés sur l'inverse de la variance estimée des résidus :
+
+{r, echo=FALSE}
+mod_robust <- lm_robust(quality ~ total.sulfur.dioxide + free.sulfur.dioxide + alcohol + volatile.acidity + citric.acid + residual.sugar + chlorides + pH + sulphates, data = wine)
+summary(mod_robust)
+
+bp_test <- bptest(mod_robust)
+
+La valeur de p du est inférieur encore au seuil de significativité (0.05), on rejete donc l’homoscédasticité. Nous allons tester avec un log-linéarisation de notre variable dépendante :
+
+{r, echo=FALSE}
+wine$quality_log <- log(wine$quality)
+
+Modèle avec la variable dépendante transformée
+
+{r, echo=FALSE}
+mod_log <- lm(quality_log ~ total.sulfur.dioxide + free.sulfur.dioxide + alcohol +
+                volatile.acidity + chlorides + pH + sulphates, data = wine)
+
+bp_test <- bptest(mod_log)
+bp_test
+
+La p-value est une nouvelle fois inférieur à 5%. Nous n’arrivons pas à rendre nos résidus homoscédastique. Nous aurons essayé plusieurs solutions en vain. Nous allons effectuer notre régression linéaire tout de même pour aller au bout de notre réflexion, néanmoins, nous prendrons avec des pincettes nos résultats et saurons qu’ils ne peuvent être considérés en tant que tel dans nos interprétations.
+
+Régression linéaire
+
+On reprends le modèle de régression mod1 avec la méthode step-by-step.
+
+{r, echo=FALSE}
+summary(mod1)
+
+Interpretations : Intercept étant la valeur de la variable dépendante (quality) lorsque toutes les variables indépendantes sont égales à zéro, ici l'interpreter voudrait donner la qualité sans aucune caractéristique du vin, ce qui n'est pas logique. Quant aux coéfficient, nous avons 2 variables non significatives, citric.acid et residual.sugar, que nous allons donc supprimer pour améliorer le modèle. (p-value > 5%)
+
+{r, echo=FALSE}
+mod2 <- lm(quality ~ total.sulfur.dioxide + free.sulfur.dioxide + alcohol +
+             volatile.acidity + chlorides +
+             pH + sulphates, data = wine)
+
+summary(mod2)
+
+Désormais le modèle ne contient que des variables significatifs. Le R2 de 0.3609 indique que le modèle explique environ 36.09% de la variance totale de la qualité du vin.
+
+total.sulfur.dioxide: Pour une unité d'augmentation dans la variable "total.sulfur.dioxide", la qualité du vin diminue en moyenne d'environ 0.0041 unité. Le coefficient est significatif (p-value < 0.05), cependant ce n'est pas vraiment intéressant comme analyse car une variation de 0.0041 unités c'est extremement faible. On peut se dire que la qualité d'un vin ne viens pas directement de la variation de soufre (lié et libre). On porte la même interprétation donc sur la variable free.sulfur.dioxide.
+
+Quant à la variable alcohol, Pour une unité d'augmentation dans la teneur en alcool, la qualité du vin augmente en moyenne d'environ 0.2828 unité. La relation est positive, plus le vin est alcoolisé plus le vin rouge est meilleur.
+
+Pour la variable volatile.acidity: une augmentation d'une unité dans la variable "volatile.acidity" et la qualité du vin diminuera en moyenne d'environ 1.0 unité. La relation est négative, donc plus la quantité d'acide (acétique) est élevé, moins le vin seras de bonne qualité. C'est ce qui rends le vin un peu ressemblant à du vinaigre s'il y en a trop, donc il est logique que le coefficient associé à cette variable soit négatif.
+
+Tandis que pour la variable chlorides: Pour une augmentation d'une unité dans la variable "chlorides", la qualité du vin diminue en moyenne d'environ 2.02 unités. Cela veut dire que le sel joue négativement dans l'appréciation du vin rouge.
+
+pH: Pour une unité d'augmentation dans la variable "pH", la qualité du vin diminue en moyenne d'environ 0.46 unité. Une relation négative donc, plus le vin rouge se rapproche des gouts basiques et donc est de moins en moins acide moins bon seras celui-ci. l'acidité joue un rôle dans l'évaluation de notre variable expliquée.
+
+sulphates: Pour une augmentation d'une unité dans la variable "sulphates", la qualité du vin augmente en moyenne d'environ 0.91 unité. Le sulphate étant un antimicrobien et un antioxydant joue positivement sur le jugement du vin rouge. Plus il en présente, meilleur serait le vin.
+
+Pour faire plus court, les variables tel que l'alcool et le sulphate joue positivement sur la qualité d'un vin rouge tandis que le pH, le sel (chlorure de sodium), et l'acide acétique sont des variables influant négativement notre variable qualité.
