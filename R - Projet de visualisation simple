@@ -1,0 +1,193 @@
+---
+title: "Projet Commun - Visualisation de l'évolution des importations et exportations de la Chine et de son PIB"
+author: "Clément Noisette, Jeanne Pimont et Marie-Léa Fouché"
+date: "Avril 2022"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    number_section: no
+    df_print: paged
+    dev: png
+    theme: paper
+  pdf_document:
+    toc: yes
+    number_section: yes
+    keep_tex: yes
+    highlight: "tango"
+    df_print: kable
+    dev: png
+editor_options: 
+  chunk_output_type: console
+chunk_output_type: console
+---
+
+```{r,echo=FALSE}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(ggridges)
+library(ggpubr)
+library(modelsummary)
+library(lattice)
+library(DAAG)
+library(GGally)
+require(stargazer)
+```
+
+```{r,echo=FALSE}
+require(readxl)
+data<-read_excel("pib_imp_exp.xlsx")
+data2<-read_excel("Trimestre_pib_exp_imp.xlsx")
+data3<-read_excel("Chine_month.xlsx")
+
+```
+
+
+# Importation et exportation 
+## Par année 
+```{r, fig.align="center",fig.height=9,fig.width=6,echo=FALSE}
+par(mfrow=c(2,1))
+plot(data$...1,data$Import,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année", main="Importation",col.main="brown4")
+
+plot(data$...1,data$Export,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année", main="Exportation",col.main="brown4")
+title(main="Échange commercial de la Chine par année",outer=TRUE,line=-0.8,col.main="red")
+```
+
+
+## Par trimestre 
+
+```{r, fig.align="center",fig.height=9,fig.width=6,echo=FALSE}
+par(mfrow=c(2,1))
+plot(data2$TIME,data2$IMPORT,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année", main="Importation",col.main="brown4")
+
+plot(data2$TIME,data2$EXPORT,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année", main="Exportation",col.main="brown4")
+title(main="Échange commercial de la Chine par trimestre",outer=TRUE,line=-0.8,col.main="red")
+```
+
+## Par mois
+
+```{r, fig.align="center",fig.height=9,fig.width=6,echo=FALSE}
+par(mfrow=c(2,1))
+plot(data3$Period.desc,data3$Import,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année", main="Importation",col.main="brown4")
+
+plot(data3$Period.desc,data3$Import,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année", main="Exportation",col.main="brown4")
+title(main="Échange commercial de la Chine par mois",outer=TRUE,line=-0.8,col.main="red")
+```
+
+
+# Importation et exportation par secteur par année : 
+
+## Exportation 
+```{r,fig.align="center",fig.height=9,fig.width=8, echo=FALSE}
+par(mfrow=c(4,4))
+plot(data$...1,data$Exp_Agricultural,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année", main="Produits Agricols",col.main="brown4")
+
+plot(data$...1,data$Exp_Food,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Produits Alimentaires",col.main="brown4")
+
+plot(data$...1,data$Exp_Fuels.Min,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Combustibles",col.main="brown4")
+
+plot(data$...1,data$Exp_Office,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Produits de Bureau",col.main="brown4")
+
+plot(data$...1,data$Exp_Manufactures,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Manufactures",col.main="brown4")
+
+plot(data$...1,data$Exp_Iron.Steel,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Fer et acier",col.main="brown4")
+
+plot(data$...1,data$Exp_Chemicals,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation en million de $",xlab="Année",main="Produits chimiques",col.main="brown4")
+
+plot(data$...1,data$Exp_Pharmaceuticals,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation en million de $",xlab="Année",main="Produits Pharmaceutiques",col.main="brown4")
+
+plot(data$...1,data$Exp_Machinery,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Machinery",col.main="brown4")
+
+plot(data$...1,data$Exp_Electron,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Électronique",col.main="brown4")
+
+plot(data$...1,data$Exp_Telecom,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Télécom",col.main="brown4")
+
+plot(data$...1,data$Exp_Integrat,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Intégré",col.main="brown4")
+
+plot(data$...1,data$Exp_Transport,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Transport",col.main="brown4")
+
+plot(data$...1,data$Exp_Automotive,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Automobiles",col.main="brown4")
+
+plot(data$...1,data$Exp_Textiles,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Textiles",col.main="brown4")
+
+plot(data$...1,data$Exp_Clothing,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Exportation",xlab="Année",main="Habits",col.main="brown4")
+
+
+title(main="Exportation par type de produits",outer=TRUE,line=-0.8,col.main="red")
+dev.off()
+```
+
+## Importation 
+
+```{r,fig.align="center",fig.height=9,fig.width=8, echo=FALSE}
+par(mfrow=c(4,4))
+plot(data$...1,data$Imp_Agricultural,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année", main="Produits Agricols",col.main="brown4")
+
+plot(data$...1,data$Imp_Food,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Produits Alimentaires",col.main="brown4")
+
+plot(data$...1,data$Imp_Fuels.Min,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Combustibles",col.main="brown4")
+
+plot(data$...1,data$Imp_Office,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Produits de Bureau",col.main="brown4")
+
+plot(data$...1,data$Imp_Manufactures,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Manufactures",col.main="brown4")
+
+plot(data$...1,data$Imp_Iron.Steel,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Fer et acier",col.main="brown4")
+
+plot(data$...1,data$Imp_Chemicals,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importationn en million de $",xlab="Année",main="Produits chimiques",col.main="brown4")
+
+plot(data$...1,data$Imp_Pharmaceuticals,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation en million de $",xlab="Année",main="Produits Pharmaceutiques",col.main="brown4")
+
+plot(data$...1,data$Imp_Machinery,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Machinery",col.main="brown4")
+
+plot(data$...1,data$Imp_Electron,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Électronique",col.main="brown4")
+
+plot(data$...1,data$Imp_Telecom,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Télécom",col.main="brown4")
+
+plot(data$...1,data$Imp_Integrat,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Intégré",col.main="brown4")
+
+plot(data$...1,data$Imp_Transport,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Transport",col.main="brown4")
+
+plot(data$...1,data$Imp_Automotive,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Automobiles",col.main="brown4")
+
+plot(data$...1,data$Imp_Textiles,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Textiles",col.main="brown4")
+
+plot(data$...1,data$Imp_Clothing,axes=T,pch=16,type="o",cex=2,col="orange",ylab="Importation",xlab="Année",main="Habits",col.main="brown4")
+
+
+title(main="Importation par type de produits",outer=TRUE,line=-0.8,col.main="red")
+dev.off()
+```
+
+
+
+# PIb et échange 
+
+## Relation PIB export/import
+
+```{r, fig.align="center",fig.height=9,fig.width=6, echo=FALSE}
+
+par(mfrow=c(2,1))
+plot(data$Import,data$PIB,xlab="Importation",ylab="PIB",main="Importation",col="aquamarine4",pch=20,col.main="brown4")
+
+
+plot(data$Export, data$PIB, xlab="Exportation",ylab="PIB",main="Exportation",pch=20,col="aquamarine4",col.main="brown4")
+
+title(main="Relation entre le PIB et les échanges",outer=TRUE,line=-0.8,col.main="red")
+
+```
+
+
+## Régression 
+```{r, results='asis', echo=FALSE}
+reg1 <- lm(PIB~Import,data=data)
+reg2<- lm(PIB~Export,data=data)
+reg3<- lm(Export~Import,data=data)
+
+summary(reg1)
+summary(reg2)
+summary(reg3)
+
+```
+
